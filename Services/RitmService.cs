@@ -99,6 +99,7 @@ namespace GradesNotification.Services
                 }  
                 catch (Exception e)
                 {
+                    _logger.LogInformation($"Parsing semesters for student {student.RitmLogin} stopped at {i}. Exception: {e}");
                     break;
                 }
             }

@@ -34,9 +34,12 @@ namespace GradesNotification
 
             services.Configure<MongoOptions>(this.Configuration.GetSection("mongo"));
             services.Configure<ApplicationOptions>(this.Configuration.GetSection("app"));
+            services.Configure<BotConfiguration>(this.Configuration.GetSection("bot"));
 
             services.AddSingleton<RitmService>();
+            services.AddSingleton<TelegramService>();
             services.AddSingleton<StudentsRepository>();
+
             services.AddQuartz();
         }
 

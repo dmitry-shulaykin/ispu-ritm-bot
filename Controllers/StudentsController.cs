@@ -93,8 +93,9 @@ namespace GradesNotification.Controllers
             try
             {
                 var student = _studentsRepository.GetByRitmLogin(ritm_login);
-                var semestr = student.Semesters.FirstOrDefault(s.Numeber == semestr_number);
-                var result = Json(new { ok = true, semestr);
+                var semestr = student.Semesters.FirstOrDefault(s => s.Number == semestr_number);
+                var result = Json(new { ok = true, semestr});
+
                 if (semestr == null)
                 {
                     result.StatusCode = (int) HttpStatusCode.NotFound;

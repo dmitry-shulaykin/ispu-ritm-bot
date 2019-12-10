@@ -16,10 +16,11 @@ namespace GradesNotification.Controllers
     public class SchedulerController : ControllerBase
     {
         private readonly ILogger<SchedulerController> _logger;
-        privaate readonly IJobFactory jobFactory;
+        private readonly IJobFactory _jobFactory;
         public SchedulerController(ILogger<SchedulerController> scheduleUpdateRequest, IJobFactory jobFactory)
         {
             _logger = scheduleUpdateRequest;
+            _jobFactory = jobFactory;
         }
 
         [HttpPost]
@@ -27,12 +28,13 @@ namespace GradesNotification.Controllers
         {
             try
             {
-                jobFactory.NewJob()
+                // _jobFactory.NewJob()
             } 
             catch
             {
 
             }
+            return Ok("ok");
         }
     }
 }
