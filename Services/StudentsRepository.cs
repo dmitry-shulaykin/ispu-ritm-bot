@@ -30,7 +30,7 @@ namespace GradesNotification.Services
             } 
             else
             {
-                return null;
+                throw new Exception("Couldn't check student credentials");
             }
         }
 

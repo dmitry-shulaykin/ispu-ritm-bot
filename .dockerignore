@@ -1,4 +1,6 @@
 bin/
 .vs/
 obj/
+out/
 appsettings.Development.json
+ClientApp/node_modules/

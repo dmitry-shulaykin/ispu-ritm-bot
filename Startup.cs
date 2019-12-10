@@ -8,6 +8,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Quartz;
+using Telegram.Bot;
 
 namespace GradesNotification
 {
@@ -35,6 +36,10 @@ namespace GradesNotification
             services.Configure<MongoOptions>(this.Configuration.GetSection("mongo"));
             services.Configure<ApplicationOptions>(this.Configuration.GetSection("app"));
             services.Configure<BotConfiguration>(this.Configuration.GetSection("bot"));
+
+            // var config = this.Configuration.GetSection("admin").Get<BotConfiguration>();
+            // var bot = new TelegramBotClient(config.BotToken);
+            // bot.
 
             services.AddSingleton<RitmService>();
             services.AddSingleton<TelegramService>();
