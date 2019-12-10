@@ -31,34 +31,56 @@ namespace GradesNotification.Services
 
         public async Task EchoAsync(Update update)
         {
-            if (update.Type != UpdateType.Message)
+            if (update == null || update.Type != UpdateType.Message)
             {
+                _logger.LogWarning("update == null or update type is not message");
                 return;
             }
 
             var message = update.Message;
 
-            _logger.LogInformation("Received Message from {0}", message.Chat.Id);
+            if (message == null) 
+            {
+                _logger.LogWarning("message == null");
+                return;
+            }
 
+            _logger.LogInformation("Received Message from {0}", message.Chat.Id);
             if (message.Type == MessageType.Text)
             {
                 // Echo each Message
-                await _client.SendTextMessageAsync(message.Chat.Id, message.Text);
+                try 
+                {
+                    await _client.SendTextMessageAsync(message.Chat.Id, message.Text);
+                }  
+                catch (Exception e)
+                {
+                    _logger.LogError($"Message type is text, couldnt sent back {e}");
+                }
             }
             else if (message.Type == MessageType.Photo)
             {
-                // Download Photo
-                var fileId = message.Photo.LastOrDefault()?.FileId;
-                var file = await _client.GetFileAsync(fileId);
-
-                var filename = file.FileId + "." + file.FilePath.Split('.').Last();
-
-                using (var saveImageStream = System.IO.File.Open(filename, FileMode.Create))
+               try 
                 {
-                    await _client.DownloadFileAsync(file.FilePath, saveImageStream);
-                }
+                    var fileId = message.Photo.LastOrDefault()?.FileId;
+                    var file = await _client.GetFileAsync(fileId);
 
-                await _client.SendTextMessageAsync(message.Chat.Id, "Thx for the Pics");
+                    var filename = file.FileId + "." + file.FilePath.Split('.').Last();
+
+                    using (var saveImageStream = System.IO.File.Open(filename, FileMode.Create))
+                    {
+                        await _client.DownloadFileAsync(file.FilePath, saveImageStream);
+                    }
+
+                    await _client.SendTextMessageAsync(message.Chat.Id, "Thx for the Pics");
+                }  
+                catch (Exception e)
+                {
+                    _logger.LogError($"Message type is photo, couldnt sent back. {e}");
+                }
+            }
+            else {
+                _logger.LogInformation($"Message type unknow {update} {message} {message.Type}");
             }
         }
     }
