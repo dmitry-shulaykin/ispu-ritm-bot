@@ -11,6 +11,9 @@ namespace GradesNotification.Models
         [JsonProperty("id")]
         public string Id { get; set; }
 
+        [JsonProperty("chat_id")]
+        public long ChatId { get; set; }
+
         [JsonProperty("ritm_login")]
         public string RitmLogin { get; set; }
 

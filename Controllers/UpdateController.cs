@@ -2,10 +2,11 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using GradesNotification.Services;
 using Telegram.Bot.Types;
+using System.IO;
 
 namespace GradesNotification.Controllers
 {
-    [Route("api/[controller]")]
+    [Route("api/update")]
     public class UpdateController : Controller
     {
         private readonly TelegramService _updateService;
@@ -19,7 +20,7 @@ namespace GradesNotification.Controllers
         [HttpPost]
         public async Task<IActionResult> Post([FromBody]Update update)
         {
-            await _updateService.EchoAsync(update);
+            await _updateService.HandleUpdate(update);
             return Ok();
         }
     }

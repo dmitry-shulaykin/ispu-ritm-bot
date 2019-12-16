@@ -88,18 +88,92 @@ namespace GradesNotification.Controllers
         }
 
         [HttpGet("{ritm_login}/semestr/{semestr_number}")]
-        public IActionResult Get(string ritm_login, int semestr_number)
+        public IActionResult GetSemestr(string ritm_login, int semestr_number)
         {
             try
             {
                 var student = _studentsRepository.GetByRitmLogin(ritm_login);
                 var semestr = student.Semesters.FirstOrDefault(s => s.Number == semestr_number);
-                var result = Json(new { ok = true, semestr});
+                var result = Json(new { ok = true, semestr });
 
                 if (semestr == null)
                 {
-                    result.StatusCode = (int) HttpStatusCode.NotFound;
+                    result.StatusCode = (int)HttpStatusCode.NotFound;
                 }
+
+                return result;
+            }
+            catch (Exception e)
+            {
+                _logger.LogError($"Can't get student with login {ritm_login}. Exception: {e.ToString()}");
+                var result = Json(new { ok = false });
+                result.StatusCode = (int)HttpStatusCode.BadRequest;
+                return result;
+            }
+        }
+
+
+        [HttpGet("{ritm_login}/semestr/{semestr_number}/subject/{subject_name}")]
+        public IActionResult GetSubject(string ritm_login, int semestr_number, string subject_name)
+        {
+            try
+            {
+                var student = _studentsRepository.GetByRitmLogin(ritm_login);
+                var semestr = student.Semesters.FirstOrDefault(s => s.Number == semestr_number);
+                var subject = semestr?.Subjects?.FirstOrDefault(s => s.Name == subject_name);
+                var result = Json(new { ok = true, subject });
+
+                if (subject == null)
+                {
+                    result = Json(new { ok = false });
+                    result.StatusCode = (int)HttpStatusCode.NotFound;
+                    return result;
+                }
+
+                return result;
+            }
+            catch (Exception e)
+            {
+                _logger.LogError($"Can't get student with login {ritm_login}. Exception: {e.ToString()}");
+                var result = Json(new { ok = false });
+                result.StatusCode = (int)HttpStatusCode.BadRequest;
+                return result;
+            }
+        }
+
+
+        [HttpPut("{ritm_login}/semestr/{semestr_number}/subject/{subject_name}")]
+        public IActionResult PutSubject(string ritm_login, int semestr_number, string subject_name, [FromBody] NewMark newMark)
+        {
+            try
+            {
+                var student = _studentsRepository.GetByRitmLogin(ritm_login);
+                var semestr = student.Semesters.FirstOrDefault(s => s.Number == semestr_number);
+                var subject = semestr?.Subjects?.FirstOrDefault(s => s.Name == subject_name);
+                var result = Json(new { ok = true });
+
+                if (subject == null)
+                {
+                    result = Json(new { ok = false });
+                    result.StatusCode = (int)HttpStatusCode.NotFound;
+                    return result;
+                }
+
+                semestr.Subjects.Remove(subject);
+                semestr.Subjects.Add(new Subject
+                {
+                    Name = subject.Name,
+                    Semestr = semestr.Number,
+                    Test1 = newMark.Test1,
+                    Test2 = newMark.Test2,
+                    Test3 = newMark.Test3,
+                    Test4 = newMark.Test4,
+                    Rating = newMark.Rating,
+                    Exam = newMark.Exam,
+                    Grade = newMark.Grade,
+                });
+
+                _studentsRepository.Update(student.Id, student);
 
                 return result;
             }

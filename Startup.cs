@@ -25,7 +25,7 @@ namespace GradesNotification
         public void ConfigureServices(IServiceCollection services)
         {
 
-            services.AddControllersWithViews();
+            services.AddControllersWithViews().AddNewtonsoftJson();
 
             // In production, the React files will be served from this directory
             services.AddSpaStaticFiles(c =>
@@ -37,25 +37,22 @@ namespace GradesNotification
             services.Configure<ApplicationOptions>(this.Configuration.GetSection("app"));
             services.Configure<BotConfiguration>(this.Configuration.GetSection("bot"));
 
-            // var config = this.Configuration.GetSection("admin").Get<BotConfiguration>();
-            // var bot = new TelegramBotClient(config.BotToken);
-            // bot.
-
             services.AddSingleton<RitmService>();
-            services.AddSingleton<TelegramService>();
+            services.AddSingleton<BotService>();
+            services.AddTransient<TelegramService>();
             services.AddSingleton<StudentsRepository>();
 
-            services.AddQuartz();
+            services.AddQuartz(typeof(CrawlStudentJob));
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-        public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+        public void Configure(IApplicationBuilder app/*, IWebHostEnvironment env*/)
         {
-            if (env.IsDevelopment())
-            {
-                app.UseDeveloperExceptionPage();
-            }
-            else
+            //if (env.IsDevelopment())
+            //{
+            //    app.UseDeveloperExceptionPage();
+            //}
+            //else
             {
                 app.UseExceptionHandler("/Error");
                 // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
@@ -65,26 +62,25 @@ namespace GradesNotification
             app.UseHttpsRedirection();
             app.UseStaticFiles();
             app.UseSpaStaticFiles();
-
             app.UseRouting();
 
             app.UseEndpoints(endpoints =>
             {
                 endpoints.MapControllerRoute(
                     name: "default",
-                    pattern: "{controller}/{action=Index}/{id?}");
+                    pattern: "{controller}/{action=Index}");
             });
 
-            app.UseQuartz();
-            app.UseSpa(spa =>
-            {
-                spa.Options.SourcePath = "ClientApp";
+            app.UseQuartz(typeof(CrawlStudentJob));
+            //app.UseSpa(spa =>
+            //{
+            //    spa.Options.SourcePath = "ClientApp";
 
-                if (env.IsDevelopment())
-                {
-                    spa.UseReactDevelopmentServer(npmScript: "start");
-                }
-            });
+            //    if (env.IsDevelopment())
+            //    {
+            //        spa.UseReactDevelopmentServer(npmScript: "start");
+            //    }
+            //});
         }
     }
 }

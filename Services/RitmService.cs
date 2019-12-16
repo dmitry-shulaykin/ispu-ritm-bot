@@ -107,6 +107,69 @@ namespace GradesNotification.Services
             return semestrList;
         }
 
+
+        private MarkChangedModel CheckMarkChanged(string value1, string value2, Semester semestr, Subject subject, Student student, string type)
+        {
+            if (value1 != value2)
+            {
+                return new MarkChangedModel
+                {
+                    Value = subject.Test1,
+                    PrevValue = subject.Test1,
+                    Semestr = semestr.Number,
+                    Student = student.RitmLogin,
+                    SubjectName = subject.Name
+                };
+            }
+            else
+            {
+                return null;
+            }
+        }
+
+        public async Task<List<MarkChangedModel>> CheckUpdatesAsync(Student student)
+        {
+            var semesters = await ParseAllSemesters(student);
+
+            var newSemestrs = new HashSet<int>();
+            var newSubjects = new HashSet<string>();
+            var changedMarks = new List<MarkChangedModel>();
+
+            foreach (var semestr in semesters)
+            {
+                foreach (var subject in semestr.Subjects)
+                {
+                    var existsSemestr = student.Semesters.FirstOrDefault(s => s.Number == subject.Semestr);
+
+                    if (existsSemestr == null)
+                    {
+                        newSemestrs.Add(subject.Semestr);
+                        continue;
+                    }
+
+                    var existsSubject = existsSemestr.Subjects.FirstOrDefault(s => s.Name == subject.Name);
+
+                    if (existsSemestr == null)
+                    {
+                        newSubjects.Add(subject.Name);
+                        continue;
+                    }
+
+                    changedMarks.Add(CheckMarkChanged(subject.Test1, existsSubject.Test1, semestr, subject, student, "TK1"));
+                    changedMarks.Add(CheckMarkChanged(subject.Test2, existsSubject.Test2, semestr, subject, student, "PK1"));
+                    changedMarks.Add(CheckMarkChanged(subject.Test3, existsSubject.Test3, semestr, subject, student, "TK1"));
+                    changedMarks.Add(CheckMarkChanged(subject.Test4, existsSubject.Test4, semestr, subject, student, "PK1"));
+                    changedMarks.Add(CheckMarkChanged(subject.Rating, existsSubject.Rating, semestr, subject, student, "Rating"));
+                    changedMarks.Add(CheckMarkChanged(subject.Exam, existsSubject.Exam, semestr, subject, student, "Exam"));
+                    changedMarks.Add(CheckMarkChanged(subject.Grade, existsSubject.Grade, semestr, subject, student, "Total"));
+
+                    changedMarks = changedMarks.Where(m => m != null).ToList();
+                }
+            }
+
+            return changedMarks;
+        }
+
         private async Task<List<Subject>> parseSemester(Student student, int semester)
         {
             try

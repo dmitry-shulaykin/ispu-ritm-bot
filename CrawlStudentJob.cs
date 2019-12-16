@@ -1,4 +1,6 @@
-﻿using GradesNotification.Services;
+﻿using GradesNotification.Extensions;
+using GradesNotification.Models;
+using GradesNotification.Services;
 using Microsoft.Extensions.Logging;
 using Quartz;
 using System;
@@ -8,57 +10,78 @@ using System.Threading.Tasks;
 
 namespace GradesNotification
 {
-    public class CrawlStudentJob : IJob
+    public class CrawlStudentJob : BaseJob
     {
         private readonly RitmService _ritmService;
         private readonly StudentsRepository _studentsRepository;
         private readonly string _ritmLogin;
         private readonly ILogger<CrawlStudentJob> _logger;
+        private readonly TelegramService _telegramService;
 
-        public CrawlStudentJob(string ritmLogin, RitmService ritmService, StudentsRepository studentsRepository, ILogger<CrawlStudentJob> logger)
+        public CrawlStudentJob()
+        {
+        }
+
+
+        public CrawlStudentJob(string ritmLogin, RitmService ritmService, StudentsRepository studentsRepository, ILogger<CrawlStudentJob> logger, TelegramService telegramService)
         {
             _ritmLogin = ritmLogin;
             _ritmService = ritmService;
             _studentsRepository = studentsRepository;
+            _telegramService = telegramService;
             _logger = logger;
         }
 
-        public async Task Execute(IJobExecutionContext context)
+        public override string JobName => nameof(CrawlStudentJob);
+
+        public override ITrigger CreateTrigger()
         {
-            try
+            var trigger = TriggerBuilder.Create()
+                .WithIdentity($"{JobName}.Trigger")
+                .StartNow()
+                .WithSimpleSchedule(scheduleBuilder =>
+                    scheduleBuilder
+                        .WithInterval(TimeSpan.FromSeconds(1))
+                        .RepeatForever())
+                .Build();
+
+            return trigger;
+        }
+
+        protected override async Task Execute()
+        {
+            _logger.LogInformation($"Execute ");
+            Console.WriteLine($"Execute ");
+            await Task.Run(async () =>
             {
-                var student = _studentsRepository.GetByRitmLogin(_ritmLogin);
-                var semesters = await _ritmService.ParseAllSemesters(student);
-
-                var newSemestrs = new HashSet<int>();
-                var newSubjects = new HashSet<string>();
-
-                foreach (var semestr in semesters)
+                try
                 {
-                    foreach (var subject in semestr.Subjects)
+                    var students = _studentsRepository.GetAll();
+                    foreach (var student in students)
                     {
-                        var existsSemestr = student.Semesters.FirstOrDefault(s => s.Number == subject.Semestr);
-
-                        if (existsSemestr == null)
+                        try
                         {
-                            newSemestrs.Add(subject.Semestr);
-                            continue;
+                            var changes = await _ritmService.CheckUpdatesAsync(student);
+                            _logger.LogInformation($"Updating marks for {student.RitmLogin}");
+                            foreach (var change in changes)
+                            {
+                                _logger.LogInformation($"Have change for {student.RitmLogin} {change.SubjectName}");
+                                _telegramService.NotifyNewMark(change);
+                            }
                         }
-
-                        var existsSubject = existsSemestr.Subjects.FirstOrDefault(s => s.Name == subject.Name);
-
-                        if (existsSemestr == null)
+                        catch (Exception e)
                         {
-                            newSubjects.Add(subject.Name);
-                            continue;
+                            _logger.LogError($"Couldn't update marks for {student.RitmLogin}. Error: {e}");
+                            _telegramService.NotifyError(student.ChatId, e.Message);
                         }
                     }
+
                 }
-            } 
-            catch (Exception e)
-            {
-                _logger.LogError($"Error when crawling student {_ritmLogin}.  Exception: {e.ToString()}");
-            }
+                catch (Exception e)
+                {
+                    _logger.LogError($"Error when crawling student {_ritmLogin}.  Exception: {e.ToString()}");
+                }
+            }).ConfigureAwait(false);
         }
     }
 }

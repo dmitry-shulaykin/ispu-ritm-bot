@@ -11,6 +11,6 @@ FROM mcr.microsoft.com/dotnet/core/aspnet:3.1-alpine AS runtime
 WORKDIR /app
 RUN apk add --no-cache icu-libs
 ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
-COPY ClientApp/build/ /app/ClientApp/
+COPY ClientApp/build/ /app/ClientApp/build/
 COPY --from=build /app/out ./
 ENTRYPOINT ["dotnet", "GradesNotification.dll"]
