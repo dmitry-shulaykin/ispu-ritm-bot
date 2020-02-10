@@ -91,7 +91,8 @@ namespace GradesNotification.Services
                                 } else
                                 {
                                         await _studentsRepository.CreateStudent(new Student { ChatId = chatId, RitmLogin = ritmLogin, Password = ritmPassword });
-                                }
+                                        await _botService.Client.SendTextMessageAsync(message.Chat.Id, "Login has been added to the list", ParseMode.Markdown);
+                                    }
                             }
                             catch (Exception e)
                             {
