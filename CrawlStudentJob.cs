@@ -10,78 +10,96 @@ using System.Threading.Tasks;
 
 namespace GradesNotification
 {
-    public class CrawlStudentJob : BaseJob
+    public class CrawlStudentJob : IJob
     {
         private readonly RitmService _ritmService;
         private readonly StudentsRepository _studentsRepository;
-        private readonly string _ritmLogin;
         private readonly ILogger<CrawlStudentJob> _logger;
         private readonly TelegramService _telegramService;
 
-        public CrawlStudentJob()
+        public CrawlStudentJob(RitmService ritmService, StudentsRepository studentsRepository, ILogger<CrawlStudentJob> logger, TelegramService telegramService)
         {
-        }
-
-
-        public CrawlStudentJob(string ritmLogin, RitmService ritmService, StudentsRepository studentsRepository, ILogger<CrawlStudentJob> logger, TelegramService telegramService)
-        {
-            _ritmLogin = ritmLogin;
+            Console.WriteLine("CrawlStudentJob(string ritmLogin, RitmService ritmService, StudentsRepository studentsRepository, ILogger<CrawlStudentJob> logger, TelegramService telegramService)");
             _ritmService = ritmService;
             _studentsRepository = studentsRepository;
             _telegramService = telegramService;
             _logger = logger;
         }
 
-        public override string JobName => nameof(CrawlStudentJob);
+        public static string JobName => nameof(CrawlStudentJob);
 
-        public override ITrigger CreateTrigger()
+        public static ITrigger CreateTrigger()
         {
             var trigger = TriggerBuilder.Create()
                 .WithIdentity($"{JobName}.Trigger")
-                .StartNow()
-                .WithSimpleSchedule(scheduleBuilder =>
+                  .WithSimpleSchedule(scheduleBuilder =>
                     scheduleBuilder
-                        .WithInterval(TimeSpan.FromSeconds(1))
+                        .WithInterval(TimeSpan.FromMinutes(60))
                         .RepeatForever())
+                //.WithDailyTimeIntervalSchedule
+                //  (s =>
+                //     s.WithIntervalInHours(24)
+                //    .OnEveryDay()
+                //    .StartingDailyAt(TimeOfDay.HourAndMinuteOfDay(6, 0))
+                //  )
                 .Build();
 
             return trigger;
         }
 
-        protected override async Task Execute()
+        public Task Execute(IJobExecutionContext context)
         {
-            _logger.LogInformation($"Execute ");
-            Console.WriteLine($"Execute ");
-            await Task.Run(async () =>
+            _logger.LogInformation($"Execute crawling job");
+            return Task.Run(async () =>
             {
+                List<Student> students;
                 try
-                {
-                    var students = _studentsRepository.GetAll();
-                    foreach (var student in students)
+                { 
+                    using (var task = _logger.GetTelemetryEventDisposable("getting students for crawling"))
                     {
-                        try
-                        {
-                            var changes = await _ritmService.CheckUpdatesAsync(student);
-                            _logger.LogInformation($"Updating marks for {student.RitmLogin}");
-                            foreach (var change in changes)
-                            {
-                                _logger.LogInformation($"Have change for {student.RitmLogin} {change.SubjectName}");
-                                _telegramService.NotifyNewMark(change);
-                            }
-                        }
-                        catch (Exception e)
-                        {
-                            _logger.LogError($"Couldn't update marks for {student.RitmLogin}. Error: {e}");
-                            _telegramService.NotifyError(student.ChatId, e.Message);
-                        }
+                        students = await _studentsRepository.GetAll();
                     }
 
+                    using (var task = _logger.GetTelemetryEventDisposable("crawling all students"))
+                    {
+                        students = await _studentsRepository.GetAll();
+                        _logger.LogInformation($"Crawl students(Total {students.Count})");
+                        foreach (var student in students)
+                        {
+                            try
+                            {
+                                using (var subtask = _logger.GetTelemetryEventDisposable($"crawling student {student.RitmLogin}"))
+                                {
+                                    var (changes, semesters) = await _ritmService.CheckUpdatesAsync(student);
+                                    foreach (var change in changes)
+                                    {
+                                        _logger.LogInformation($"Have change for {student.RitmLogin} {change.SubjectName}");
+                                        _telegramService.NotifyNewMark(change);
+                                    }
+
+                                    if (changes.Count == 0)
+                                    {
+                                        _telegramService.NotifyJobRun(student);
+                                    }
+
+
+                                    student.Semesters = semesters;
+                                    await _studentsRepository.UpdateStudent(student);
+                                }
+                            }
+                            catch (Exception e)
+                            {
+                                _logger.LogError($"Couldn't update marks for {student.RitmLogin}. Error: {e}");
+                                _telegramService.NotifyError(student, e);
+                            }
+                        }
+                    }
                 }
                 catch (Exception e)
                 {
-                    _logger.LogError($"Error when crawling student {_ritmLogin}.  Exception: {e.ToString()}");
+                    _logger.LogError($"Error when crawling students. Exception: {e.ToString()}");
                 }
-            }).ConfigureAwait(false);
+            });
         }
     }
 }

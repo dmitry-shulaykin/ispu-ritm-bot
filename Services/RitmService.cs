@@ -22,49 +22,42 @@ namespace GradesNotification.Services
 
         private async Task<HtmlDocument> getHtmlDoc(Student student, string url)
         {
-            try
+            var postData = new Dictionary<string, string>
             {
-                var postData = new Dictionary<string, string>();
-                postData["LoginForm[username]"] = student.RitmLogin;
-                postData["LoginForm[password]"] = student.Password;
-                postData["LoginForm[rememberMe]"] = "0";
-                postData["yt0"] = "";
+                ["LoginForm[username]"] = student.RitmLogin,
+                ["LoginForm[password]"] = student.Password,
+                ["LoginForm[rememberMe]"] = "0",
+                ["yt0"] = ""
+            };
 
-                var cookieContainer = new CookieContainer();
-                using (var handler = new HttpClientHandler() { CookieContainer = cookieContainer })
+            var cookieContainer = new CookieContainer();
+            using (var handler = new HttpClientHandler() { CookieContainer = cookieContainer })
+            {
+                using (var httpClient = new HttpClient(handler))
                 {
-                    using (var httpClient = new HttpClient(handler))
+                    using (var content = new FormUrlEncodedContent(postData))
                     {
-                        using (var content = new FormUrlEncodedContent(postData))
-                        {
-                            content.Headers.Clear();
-                            content.Headers.Add("Content-Type", "application/x-www-form-urlencoded");
+                        content.Headers.Clear();
+                        content.Headers.Add("Content-Type", "application/x-www-form-urlencoded");
 
-                            var loginResponse = await httpClient.PostAsync("http://ritm.ispu.ru/login", content);
-                            _logger.LogInformation($"Request completed, status = {loginResponse.StatusCode}");
-                        }
+                        var loginResponse = await httpClient.PostAsync("http://ritm.ispu.ru/login", content);
+                        _logger.LogInformation($"Request completed, status = {loginResponse.StatusCode}");
                     }
                 }
-
-                var htmlWeb = new HtmlWeb();
-                var request = (HttpWebRequest)WebRequest.Create(url);
-                request.Method = "GET";
-                request.CookieContainer = cookieContainer;
-
-                var response = request.GetResponse();
-                var stream = response.GetResponseStream();
-                var streamreader = new StreamReader(stream);
-                var str = await streamreader.ReadToEndAsync();
-
-                var document = new HtmlDocument();
-                document.LoadHtml(str);
-                return document;
-            } catch (Exception e)
-            {
-                var message = $"Couldn't connect to the Ritm for student: {student.RitmLogin}. Exception: {e.ToString()}";
-                _logger.LogError(message);
-                throw new Exception(message, e);
             }
+
+            var request = (HttpWebRequest)WebRequest.Create(url);
+            request.Method = "GET";
+            request.CookieContainer = cookieContainer;
+
+            var response = request.GetResponse();
+            var stream = response.GetResponseStream();
+            var streamReader = new StreamReader(stream);
+            var str = await streamReader.ReadToEndAsync();
+
+            var document = new HtmlDocument();
+            document.LoadHtml(str);
+            return document;
         }
 
         public async Task<bool> CheckStudentPassword(Student student)
@@ -116,9 +109,10 @@ namespace GradesNotification.Services
                 {
                     Value = subject.Test1,
                     PrevValue = subject.Test1,
-                    Semestr = semestr.Number,
+                    Semester = semestr.Number,
                     Student = student.RitmLogin,
-                    SubjectName = subject.Name
+                    SubjectName = subject.Name,
+                    Type = type
                 };
             }
             else
@@ -127,9 +121,14 @@ namespace GradesNotification.Services
             }
         }
 
-        public async Task<List<MarkChangedModel>> CheckUpdatesAsync(Student student)
+        public async Task<(List<MarkChangedModel>, List<Semester>)> CheckUpdatesAsync(Student student)
         {
             var semesters = await ParseAllSemesters(student);
+
+            if (semesters.Count == 0)
+            {
+                throw new Exception("parsed zero semesters");
+            }
 
             var newSemestrs = new HashSet<int>();
             var newSubjects = new HashSet<string>();
@@ -139,11 +138,11 @@ namespace GradesNotification.Services
             {
                 foreach (var subject in semestr.Subjects)
                 {
-                    var existsSemestr = student.Semesters.FirstOrDefault(s => s.Number == subject.Semestr);
+                    var existsSemestr = student.Semesters.FirstOrDefault(s => s.Number == subject.Semester);
 
                     if (existsSemestr == null)
                     {
-                        newSemestrs.Add(subject.Semestr);
+                        newSemestrs.Add(subject.Semester);
                         continue;
                     }
 
@@ -167,7 +166,7 @@ namespace GradesNotification.Services
                 }
             }
 
-            return changedMarks;
+            return (changedMarks, semesters);
         }
 
         private async Task<List<Subject>> parseSemester(Student student, int semester)
@@ -188,7 +187,7 @@ namespace GradesNotification.Services
                 {
                     var subject = new Subject()
                     {
-                        Semestr = semester,
+                        Semester = semester,
                         Name = nodes[i + 0].InnerText,
                         Test1 = nodes[i + 1].InnerText,
                         Test2 = nodes[i + 2].InnerText,
@@ -206,7 +205,7 @@ namespace GradesNotification.Services
             }
             catch (Exception e)
             {
-                _logger.LogError($"Couldn't check user {student.RitmLogin}, semester {semester}. Exception: {e.ToString()}");
+                _logger.LogError($"Couldn't check user {student.RitmLogin}, semester {semester}. Exception: {e}");
                 return new List<Subject>();
             }
         }

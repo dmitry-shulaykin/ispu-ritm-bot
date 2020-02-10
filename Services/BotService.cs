@@ -1,9 +1,5 @@
 ﻿using Microsoft.Extensions.Options;
-using MihaZupan;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+
 using Telegram.Bot;
 
 namespace GradesNotification.Services
@@ -15,7 +11,6 @@ namespace GradesNotification.Services
         public BotService(IOptions<BotConfiguration> config)
         {
             _config = config.Value;
-            // use proxy if configured in appsettings.*.json
             Client = new TelegramBotClient(_config.BotToken);
         }
 

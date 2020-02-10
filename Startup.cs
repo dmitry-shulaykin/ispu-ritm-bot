@@ -1,14 +1,13 @@
-using GradesNotification.Extensions;
-using GradesNotification.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.HttpsPolicy;
-using Microsoft.AspNetCore.SpaServices.ReactDevelopmentServer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Quartz;
-using Telegram.Bot;
+
+using GradesNotification.Extensions;
+using GradesNotification.Middlewares;
+using GradesNotification.Services;
+using Microsoft.AspNetCore.SpaServices.ReactDevelopmentServer;
 
 namespace GradesNotification
 {
@@ -33,37 +32,37 @@ namespace GradesNotification
                 c.RootPath = "ClientApp/build";
             });
 
-            services.Configure<MongoOptions>(this.Configuration.GetSection("mongo"));
-            services.Configure<ApplicationOptions>(this.Configuration.GetSection("app"));
-            services.Configure<BotConfiguration>(this.Configuration.GetSection("bot"));
+            services.Configure<MongoOptions>(Configuration.GetSection("mongo"));
+            services.Configure<ApplicationOptions>(Configuration.GetSection("app"));
+            services.Configure<BotConfiguration>(Configuration.GetSection("bot"));
 
             services.AddSingleton<RitmService>();
             services.AddSingleton<BotService>();
             services.AddTransient<TelegramService>();
             services.AddSingleton<StudentsRepository>();
 
-            services.AddQuartz(typeof(CrawlStudentJob));
+            services.AddQuartz();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-        public void Configure(IApplicationBuilder app/*, IWebHostEnvironment env*/)
+        public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
-            //if (env.IsDevelopment())
-            //{
-            //    app.UseDeveloperExceptionPage();
-            //}
-            //else
+            if (env.IsDevelopment())
             {
-                app.UseExceptionHandler("/Error");
+                app.UseDeveloperExceptionPage();
+            }
+            else
+            {
+                // app.UseExceptionHandler("/Error");
                 // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
                 app.UseHsts();
             }
 
-            app.UseHttpsRedirection();
+            // app.UseHttpsRedirection();
             app.UseStaticFiles();
             app.UseSpaStaticFiles();
             app.UseRouting();
-
+            app.UseErrorLoggingMiddleware();
             app.UseEndpoints(endpoints =>
             {
                 endpoints.MapControllerRoute(
@@ -71,16 +70,16 @@ namespace GradesNotification
                     pattern: "{controller}/{action=Index}");
             });
 
-            app.UseQuartz(typeof(CrawlStudentJob));
-            //app.UseSpa(spa =>
-            //{
-            //    spa.Options.SourcePath = "ClientApp";
+            app.UseQuartz();
+            app.UseSpa(spa =>
+            {
+                spa.Options.SourcePath = "ClientApp";
 
-            //    if (env.IsDevelopment())
-            //    {
-            //        spa.UseReactDevelopmentServer(npmScript: "start");
-            //    }
-            //});
+                if (env.IsDevelopment())
+                {
+                    spa.UseReactDevelopmentServer(npmScript: "start");
+                }
+            });
         }
     }
 }

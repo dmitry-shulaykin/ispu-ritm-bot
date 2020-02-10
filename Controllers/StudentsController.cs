@@ -1,18 +1,10 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using System.Net.Http;
-using System.Xml.XPath;
 using Microsoft.Extensions.Logging;
-using HtmlAgilityPack;
-using System.Net;
-using System.Text;
-using System.IO;
 using GradesNotification.Models;
 using GradesNotification.Services;
+using GradesNotification.Extensions;
 
 namespace GradesNotification.Controllers
 {
@@ -28,163 +20,213 @@ namespace GradesNotification.Controllers
             _studentsRepository = studentsRepository;
         }
 
+        [HttpGet]
+        public IActionResult Get()
+        {
+            return OkJson("Hello world");
+        }
 
-        [HttpGet("{ritm_login}")]
-        public IActionResult Get(string ritm_login)
+        [HttpGet("{ritmLogin}")]
+        public async Task<IActionResult> GetStudent(string ritmLogin)
         {
             try
             {
-                var student = _studentsRepository.GetByRitmLogin(ritm_login);
+                var student = await _studentsRepository.GetByRitmLogin(ritmLogin);
                 if (student == null)
                 {
-                    _logger.LogWarning($"Can't find student with login {ritm_login}.");
+                    return NotFoundJson();
                 }
 
-                var result = Json(new { ok = student != null, student });
-                result.StatusCode = (int)(student == null ? HttpStatusCode.NotFound : HttpStatusCode.OK);
-                return result;
+                return OkJson(student);
             }
             catch (Exception e)
             {
-                _logger.LogError($"Can't get student with login {ritm_login}. Exception: {e.ToString()}");
-                var result = Json(new { ok = false, student = (Student)null });
-                result.StatusCode = (int)HttpStatusCode.BadRequest;
-                return result;
+                throw new Exception($"Can't get student with login {ritmLogin}", e);
             }
         }
 
-        [HttpPut("{ritm_login}")]
-        public IActionResult Update(string ritm_login, [FromBody] Student student)
+        [HttpGet("{ritmLogin}/semester/{semesterNumber}")]
+        public async Task<IActionResult> GetSemester(string ritmLogin, int semesterNumber)
         {
             try
             {
-                _studentsRepository.Update(ritm_login, student);
-                return Json(new { ok = true });
-            }
-            catch (Exception e)
-            {
-                _logger.LogError($"Update failed: {e}");
-                var result = Json(new { ok = false });
-                result.StatusCode = (int)HttpStatusCode.BadRequest;
-                return result;
-            }
-        }
-
-        [HttpDelete("{ritm_login}")]
-        public IActionResult Delete(string ritm_login)
-        {
-            try
-            {
-                _studentsRepository.Remove(ritm_login);
-                return Json(new { ok = true });
-            }
-            catch (Exception e)
-            {
-                _logger.LogError($"Update failed: {e}");
-                var result = Json(new { ok = false });
-                result.StatusCode = (int)HttpStatusCode.BadRequest;
-                return result;
-            }
-        }
-
-        [HttpGet("{ritm_login}/semestr/{semestr_number}")]
-        public IActionResult GetSemestr(string ritm_login, int semestr_number)
-        {
-            try
-            {
-                var student = _studentsRepository.GetByRitmLogin(ritm_login);
-                var semestr = student.Semesters.FirstOrDefault(s => s.Number == semestr_number);
-                var result = Json(new { ok = true, semestr });
-
-                if (semestr == null)
+                using var task = _logger.GetTelemetryEventDisposable("Get semester");
+                var semester = await _studentsRepository.GetStudentSemester(ritmLogin, semesterNumber);
+                if (semester == null)
                 {
-                    result.StatusCode = (int)HttpStatusCode.NotFound;
+                    return NotFoundJson();
                 }
 
-                return result;
+                return OkJson(semester);
             }
             catch (Exception e)
             {
-                _logger.LogError($"Can't get student with login {ritm_login}. Exception: {e.ToString()}");
-                var result = Json(new { ok = false });
-                result.StatusCode = (int)HttpStatusCode.BadRequest;
-                return result;
+                throw new Exception($"Can't get student with login {ritmLogin} semester {semesterNumber}.", e);
             }
         }
 
-
-        [HttpGet("{ritm_login}/semestr/{semestr_number}/subject/{subject_name}")]
-        public IActionResult GetSubject(string ritm_login, int semestr_number, string subject_name)
+        [HttpGet("{ritmLogin}/semester/{semesterNumber}/subject/{subjectName}")]
+        public async Task<IActionResult> GetSubject(string ritmLogin, int semesterNumber, string subjectName)
         {
             try
             {
-                var student = _studentsRepository.GetByRitmLogin(ritm_login);
-                var semestr = student.Semesters.FirstOrDefault(s => s.Number == semestr_number);
-                var subject = semestr?.Subjects?.FirstOrDefault(s => s.Name == subject_name);
-                var result = Json(new { ok = true, subject });
-
+                var subject = await _studentsRepository.GetStudentSubject(ritmLogin, semesterNumber, subjectName);
                 if (subject == null)
                 {
-                    result = Json(new { ok = false });
-                    result.StatusCode = (int)HttpStatusCode.NotFound;
-                    return result;
+                    return NotFoundJson();
                 }
 
-                return result;
+                return OkJson(subject);
             }
             catch (Exception e)
             {
-                _logger.LogError($"Can't get student with login {ritm_login}. Exception: {e.ToString()}");
-                var result = Json(new { ok = false });
-                result.StatusCode = (int)HttpStatusCode.BadRequest;
-                return result;
+                throw new Exception($"Can't get subject with login {ritmLogin} semester {semesterNumber} subject {subjectName}", e);
             }
         }
 
 
-        [HttpPut("{ritm_login}/semestr/{semestr_number}/subject/{subject_name}")]
-        public IActionResult PutSubject(string ritm_login, int semestr_number, string subject_name, [FromBody] NewMark newMark)
+        [HttpPost]
+        public async Task<IActionResult> PostStudent([FromBody] Student student)
         {
             try
             {
-                var student = _studentsRepository.GetByRitmLogin(ritm_login);
-                var semestr = student.Semesters.FirstOrDefault(s => s.Number == semestr_number);
-                var subject = semestr?.Subjects?.FirstOrDefault(s => s.Name == subject_name);
-                var result = Json(new { ok = true });
+                var newStudent = await _studentsRepository.CreateStudent(student);
 
-                if (subject == null)
-                {
-                    result = Json(new { ok = false });
-                    result.StatusCode = (int)HttpStatusCode.NotFound;
-                    return result;
-                }
-
-                semestr.Subjects.Remove(subject);
-                semestr.Subjects.Add(new Subject
-                {
-                    Name = subject.Name,
-                    Semestr = semestr.Number,
-                    Test1 = newMark.Test1,
-                    Test2 = newMark.Test2,
-                    Test3 = newMark.Test3,
-                    Test4 = newMark.Test4,
-                    Rating = newMark.Rating,
-                    Exam = newMark.Exam,
-                    Grade = newMark.Grade,
-                });
-
-                _studentsRepository.Update(student.Id, student);
-
-                return result;
+                return OkJson(newStudent);
             }
             catch (Exception e)
             {
-                _logger.LogError($"Can't get student with login {ritm_login}. Exception: {e.ToString()}");
-                var result = Json(new { ok = false });
-                result.StatusCode = (int)HttpStatusCode.BadRequest;
-                return result;
+                throw new Exception($"Exception when creating user {student.RitmLogin}", e);
             }
         }
 
+        [HttpPost("{ritmLogin}/semester/")]
+        public async Task<IActionResult> PostStudent(string ritmLogin, int semesterNumber, [FromBody] Semester semester)
+        {
+            try
+            {
+                var newSemester = await _studentsRepository.CreateSemester(ritmLogin, semester);
+
+                return OkJson(newSemester);
+            }
+            catch (Exception e)
+            {
+                throw new Exception($"Exception when creating user {ritmLogin} semester {semesterNumber}.", e);
+            }
+        }
+
+
+        [HttpPost("{ritmLogin}/semester/{semesterNumber}/subject")]
+        public async Task<IActionResult> PostSubject(string ritmLogin, int semesterNumber, [FromBody] Subject subject)
+        {
+            try
+            {
+                var newSubject = await _studentsRepository.CreateSubject(ritmLogin, semesterNumber, subject);
+
+                return OkJson(newSubject);
+            }
+            catch (Exception e)
+            {
+                throw new Exception($"Exception when creating semester {ritmLogin} {semesterNumber}.", e);
+            }
+        }
+
+        [HttpPut("{ritmLogin}")]
+        public async Task<IActionResult> PutStudent(string ritmLogin, [FromBody] Student student)
+        {
+            try
+            {
+                student.RitmLogin = ritmLogin;
+                var newStudent = await _studentsRepository.UpdateStudent(student);
+                return OkJson(newStudent);
+            }
+            catch (Exception e)
+            {
+                throw new Exception($"Update student {ritmLogin} failed.", e);
+            }
+        }
+
+        [HttpPut("{ritmLogin}/semester/{semeterNumber}")]
+        public async Task<IActionResult> PutSemester(string ritmLogin, int semesterNumber, [FromBody] Semester semester)
+        {
+            try
+            {
+                semester.Number = semesterNumber;
+                var newSemester = await _studentsRepository.UpdateSemester(ritmLogin, semester);
+                return OkJson(newSemester);
+            }
+            catch (Exception e)
+            {
+                throw new Exception($"Update student {ritmLogin} semester {semesterNumber} failed.", e);
+            }
+        }
+
+        [HttpPut("{ritmLogin}/semester/{semesterNumber}/subject/{subjectName}")]
+        public async Task<IActionResult> PutSubject(string ritmLogin, int semesterNumber, string subjectName, [FromBody] Subject subject)
+        {
+            try
+            {
+                subject.Name = subjectName;
+                var newSubject = await _studentsRepository.UpdateSubject(ritmLogin, semesterNumber, subject);
+                return OkJson(newSubject);
+            }
+            catch (Exception e)
+            {
+                throw new Exception($"Update student {ritmLogin} semester {semesterNumber} subject {subjectName} failed.", e);
+            }
+        }
+
+        [HttpDelete("{ritmLogin}")]
+        public async Task<IActionResult> DeleteStudent(string ritmLogin)
+        {
+            try
+            {
+                await _studentsRepository.DeleteStudent(ritmLogin);
+                return OkJson<object>();
+            }
+            catch (Exception e)
+            {
+                throw new Exception($"Couldn't delete student {ritmLogin}", e);
+            }
+        }
+
+        [HttpDelete("{ritmLogin}/semester/{semesterNumber}/")]
+        public async Task<IActionResult> DeleteSemester(string ritmLogin, int semesterNumber)
+        {
+            try
+            {
+                await _studentsRepository.DeleteSemester(ritmLogin, semesterNumber);
+                return OkJson<object>();
+            }
+            catch (Exception e)
+            {
+                throw new Exception($"Couldn't delete student {ritmLogin}", e);
+            }
+        }
+
+        [HttpDelete("{ritmLogin}/semester/{semesterNumber}/subject/{subjectName}")]
+        public async Task<IActionResult> DeleteSubject(string ritmLogin, int semesterNumber, string subjectName)
+        {
+            try
+            {
+                await _studentsRepository.DeleteSubject(ritmLogin, semesterNumber, subjectName);
+                return OkJson<object>();
+            }
+            catch (Exception e)
+            {
+                throw new Exception($"Couldn't delete student {ritmLogin}", e);
+            }
+        }
+
+        private IActionResult OkJson<T>(T payload = default)
+        {
+            return new OkObjectResult(new { ok = true, payload, error = "" });
+        }
+
+        private IActionResult NotFoundJson()
+        {
+            object payload = null;
+            return new NotFoundObjectResult(new { ok = false, payload, error = "" });
+        }
     }
 }
