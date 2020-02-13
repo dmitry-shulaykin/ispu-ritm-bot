@@ -79,7 +79,7 @@ namespace GradesNotification
 
                                     if (changes.Count == 0)
                                     {
-                                        _telegramService.NotifyJobRun(student);
+                                        // _telegramService.NotifyJobRun(student);
                                     }
 
 
