@@ -26,7 +26,7 @@ namespace GradesNotification.Services
             if (student.ChatId != 0)
             {
                 await _botService.Client.SendTextMessageAsync(student.ChatId, 
-                    $"You recieved new mark(${change.Type}) *{change.PrevValue}->{change.Value}* for subject {change.SubjectName}({change.Semester})", ParseMode.Markdown);
+                    $"You recieved new mark({change.Type}) *{change.PrevValue}->{change.Value}* for subject {change.SubjectName}({change.Semester})", ParseMode.Markdown);
             }
         }
 

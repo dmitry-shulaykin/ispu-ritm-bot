@@ -101,14 +101,14 @@ namespace GradesNotification.Services
         }
 
 
-        private MarkChangedModel CheckMarkChanged(string value1, string value2, Semester semestr, Subject subject, Student student, string type)
+        private MarkChangedModel CheckMarkChanged(string newValue, string prevValue, Semester semestr, Subject subject, Student student, string type)
         {
-            if (value1 != value2)
+            if (newValue != prevValue)
             {
                 return new MarkChangedModel
                 {
-                    Value = subject.Test1,
-                    PrevValue = subject.Test1,
+                    Value = newValue,
+                    PrevValue = prevValue,
                     Semester = semestr.Number,
                     Student = student.RitmLogin,
                     SubjectName = subject.Name,
